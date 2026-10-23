@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+frontend/.next/
+frontend/out/
+
+# Environment files and secrets
+backend/.env
+frontend/.env*
+!.env.example
+
+# TypeScript and test output
+*.tsbuildinfo
+coverage/
+
+# Local IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+.agents/
+.claude/
+.cursor/
+.devin/
+backend/.git.backend-local/
+
+# Logs
+*.log
+npm-debug.log*

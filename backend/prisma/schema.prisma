@@ -1,0 +1,52 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Gift {
+  id                String     @id @default(cuid())
+  giftCode          String     @unique
+  senderAddress     String
+  recipientAddress  String?
+  amount            String
+  tokenAddress      String
+  transactionHash   String?    @unique
+  claimTransaction  String?    @unique
+  refundTransaction String?    @unique
+  status            GiftStatus @default(PENDING)
+  expiresAt         DateTime
+  claimedAt         DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  referral          Referral?
+  
+  @@index([senderAddress])
+  @@index([recipientAddress])
+  @@index([status, expiresAt])
+}
+
+model Referral {
+  id             String   @id @default(cuid())
+  giftId         String   @unique
+  referrerAddress String
+  referredAddress String?
+  createdAt      DateTime @default(now())
+
+  gift           Gift     @relation(fields: [giftId], references: [id], onDelete: Cascade)
+
+  @@index([referrerAddress])
+}
+
+enum GiftStatus {
+  PENDING
+  FUNDED
+  CLAIMED
+  EXPIRED
+  REFUNDED
+}
