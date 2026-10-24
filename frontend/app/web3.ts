@@ -18,6 +18,14 @@ function envAddress(name: string, value: string | undefined) {
   return value as Address;
 }
 
+export function friendlyError(reason: unknown, fallback: string) {
+  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  if (/user denied|user rejected|denied transaction signature|rejected the request|action_rejected|code\s*4001/i.test(message)) {
+    return "Transaction cancelled in your wallet.";
+  }
+  return message || fallback;
+}
+
 function tokenAddress() {
   return envAddress("NEXT_PUBLIC_WIF_TOKEN_ADDRESS", process.env.NEXT_PUBLIC_WIF_TOKEN_ADDRESS);
 }
@@ -75,6 +83,7 @@ function giftIdAsBytes32(giftId: string) {
 
 type Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
 type AnnouncedWallet = { info: { name: string; rdns?: string }; provider: Provider };
+export type WalletOption = { name: string; rdns?: string };
 
 declare global {
   interface Window {
@@ -82,7 +91,7 @@ declare global {
   }
 }
 
-async function provider() {
+async function announcedWallets() {
   if (typeof window === "undefined") throw new Error("Wallets are only available in the browser.");
 
   const wallets: AnnouncedWallet[] = [];
@@ -96,11 +105,22 @@ async function provider() {
   await new Promise((resolve) => window.setTimeout(resolve, 200));
   window.removeEventListener("eip6963:announceProvider", announce);
 
-  const preferred = wallets.find((wallet) => /metamask|rabby/i.test(`${wallet.info.name} ${wallet.info.rdns ?? ""}`));
-  if (preferred) return preferred.provider;
-  if (wallets[0]) return wallets[0].provider;
-  if (window.ethereum) return window.ethereum;
-  throw new Error("No compatible wallet found. Install MetaMask or Rabby.");
+  return wallets;
+}
+
+export async function listWallets(): Promise<WalletOption[]> {
+  const wallets = await announcedWallets();
+  return wallets.map((wallet) => wallet.info);
+}
+
+async function provider(selectedRdns?: string) {
+  const wallets = await announcedWallets();
+  const selected = selectedRdns
+    ? wallets.find((wallet) => wallet.info.rdns === selectedRdns || (!wallet.info.rdns && wallet.info.name === selectedRdns))
+    : wallets.find((wallet) => /metamask|rabby/i.test(`${wallet.info.name} ${wallet.info.rdns ?? ""}`));
+  if (selected) return selected.provider;
+  if (!selectedRdns && window.ethereum) return window.ethereum;
+  throw new Error("Choose a wallet before continuing.");
 }
 
 function publicClient() {
@@ -108,23 +128,35 @@ function publicClient() {
   return createPublicClient({ chain, transport: http(rpcUrl) });
 }
 
-async function walletClient() {
+async function walletClient(selectedRdns?: string) {
   ensureNetworkConfig();
-  const client = createWalletClient({ chain, transport: custom((await provider()) as never) });
+  const client = createWalletClient({ chain, transport: custom((await provider(selectedRdns)) as never) });
   const [account] = await client.getAddresses();
   if (!account) throw new Error("Connect a wallet first.");
   return { client, account };
 }
 
-export async function connectWallet() {
+export async function connectWallet(selectedRdns?: string) {
   try {
-    const activeProvider = await provider();
+    const activeProvider = await provider(selectedRdns);
     await activeProvider.request({ method: "eth_requestAccounts" });
     await activeProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: `0x${chainId.toString(16)}` }] });
-    const wallet = await walletClient();
+    const wallet = await walletClient(selectedRdns);
     return wallet.account;
   } catch {
     throw new Error("Wallet connection failed. Choose MetaMask or Rabby and enable Robinhood Chain Testnet.");
+  }
+}
+
+export async function disconnectWallet() {
+  try {
+    const activeProvider = await provider();
+    await activeProvider.request({
+      method: "wallet_revokePermissions",
+      params: [{ eth_accounts: {} }],
+    });
+  } catch {
+    // Some wallets do not support revoking permissions. The app still clears its state.
   }
 }
 
@@ -157,9 +189,11 @@ export async function createAndFundGift(senderAddress: Address, amountText: stri
   const expiresAt = BigInt(Math.floor(new Date(gift.expiresAt).getTime() / 1000));
   const { client, account } = await walletClient();
 
+  await publicClient().simulateContract({ address: tokenAddress(), abi: tokenAbi, functionName: "approve", args: [giftAddress(), amount], account });
   const approval = await client.writeContract({ address: tokenAddress(), abi: tokenAbi, functionName: "approve", args: [giftAddress(), amount], account });
   await waitForReceipt(approval);
 
+  await publicClient().simulateContract({ address: giftAddress(), abi: giftAbi, functionName: "fundGift", args: [giftId, amount, expiresAt], account });
   const funding = await client.writeContract({ address: giftAddress(), abi: giftAbi, functionName: "fundGift", args: [giftId, amount, expiresAt], account });
   await waitForReceipt(funding);
 
