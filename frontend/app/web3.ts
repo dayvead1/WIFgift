@@ -140,11 +140,34 @@ export async function connectWallet(selectedRdns?: string) {
   try {
     const activeProvider = await provider(selectedRdns);
     await activeProvider.request({ method: "eth_requestAccounts" });
-    await activeProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: `0x${chainId.toString(16)}` }] });
+    const targetChainId = `0x${chainId.toString(16)}`;
+    try {
+      await activeProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: targetChainId }] });
+    } catch (reason) {
+      const code = (reason as { code?: number }).code;
+      if (code !== 4902) throw reason;
+      await activeProvider.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: targetChainId,
+          chainName: chain.name,
+          nativeCurrency: chain.nativeCurrency,
+          rpcUrls: [rpcUrl],
+          blockExplorerUrls: explorerUrl ? [explorerUrl] : undefined,
+        }],
+      });
+    }
     const wallet = await walletClient(selectedRdns);
     return wallet.account;
-  } catch {
-    throw new Error("Wallet connection failed. Choose MetaMask or Rabby and enable Robinhood Chain Testnet.");
+  } catch (reason) {
+    const code = (reason as { code?: number }).code;
+    if (code === 4001 || /user denied|user rejected|rejected the request/i.test(String((reason as { message?: string }).message ?? reason))) {
+      throw new Error("Wallet connection cancelled.");
+    }
+    if (/No compatible wallet|Choose a wallet/i.test(String((reason as { message?: string }).message ?? reason))) {
+      throw new Error("No compatible wallet found. Install MetaMask or Rabby.");
+    }
+    throw new Error("Could not connect wallet. Please approve the connection and Robinhood Chain Testnet request.");
   }
 }
 
