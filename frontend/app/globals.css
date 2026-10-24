@@ -24,9 +24,3 @@
 @media(max-width:720px) { .send-layout { grid-template-columns:1fr; } }
 @media(max-width:480px) { .confirmation-actions { flex-wrap:wrap; }.confirmation-actions .button { flex:1; }.confirmation-card { padding-inline:16px; }.confirmation-copy { font-size:17px; } }
 @media(max-width:720px) { .navbar { height:64px; padding:0 16px; gap:10px; }.desktop-nav { display:none; }.navbar .connect-button { min-height:40px; padding:8px 12px; font-size:13px; }.theme-toggle { width:36px; height:36px; }.page-shell { width:min(100% - 28px,620px); padding-top:88px; padding-bottom:92px; }.hero { min-height:520px; border-radius:24px; }.hero-content { padding:26px; }.hero-content h1 { font-size:48px; }.home-grid,.steps { grid-template-columns:1fr; }.steps { gap:14px; }.mobile-nav { position:fixed; inset:auto 0 0; z-index:10; display:flex; justify-content:space-around; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:var(--card); backdrop-filter:blur(12px); }.mobile-nav button { display:grid; gap:1px; justify-items:center; border:0; background:transparent; color:var(--muted); font-size:21px; }.mobile-nav button small { font-size:11px; font-weight:700; }.mobile-nav button.active { color:var(--coral); } }
-
-.wallet-picker { position:absolute; top:64px; right:22px; display:grid; gap:8px; min-width:190px; padding:14px; border:1px solid var(--line); border-radius:16px; background:var(--card); box-shadow:0 12px 30px rgba(0,0,0,.12); }
-.wallet-picker strong { font-size:14px; }
-.wallet-picker button { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); text-align:left; font-weight:700; }
-.wallet-picker button:hover { border-color:var(--coral); }
-.wallet-picker .wallet-picker-close { color:var(--muted); text-align:center; }
