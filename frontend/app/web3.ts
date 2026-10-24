@@ -84,6 +84,7 @@ function giftIdAsBytes32(giftId: string) {
 type Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
 type AnnouncedWallet = { info: { name: string; rdns?: string }; provider: Provider };
 export type WalletOption = { name: string; rdns?: string };
+let walletCache: AnnouncedWallet[] = [];
 
 declare global {
   interface Window {
@@ -105,7 +106,8 @@ async function announcedWallets() {
   await new Promise((resolve) => window.setTimeout(resolve, 200));
   window.removeEventListener("eip6963:announceProvider", announce);
 
-  return wallets;
+  if (wallets.length > 0) walletCache = wallets;
+  return wallets.length > 0 ? wallets : walletCache;
 }
 
 export async function listWallets(): Promise<WalletOption[]> {
