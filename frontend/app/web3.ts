@@ -18,6 +18,14 @@ function envAddress(name: string, value: string | undefined) {
   return value as Address;
 }
 
+export function friendlyError(reason: unknown, fallback: string) {
+  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  if (/user denied|user rejected|denied transaction signature|rejected the request|action_rejected|code\s*4001/i.test(message)) {
+    return "Transaction cancelled in your wallet.";
+  }
+  return message || fallback;
+}
+
 function tokenAddress() {
   return envAddress("NEXT_PUBLIC_WIF_TOKEN_ADDRESS", process.env.NEXT_PUBLIC_WIF_TOKEN_ADDRESS);
 }
@@ -59,6 +67,12 @@ const faucetAbi = [{
   stateMutability: "nonpayable",
   inputs: [],
   outputs: [],
+}, {
+  type: "function",
+  name: "claimed",
+  stateMutability: "view",
+  inputs: [{ name: "wallet", type: "address" }],
+  outputs: [{ type: "bool" }],
 }] as const;
 
 const giftAbi = [
@@ -176,6 +190,15 @@ export async function createAndFundGift(senderAddress: Address, amountText: stri
 export async function requestTestWif() {
   if (!faucetAddress) throw new Error("Test WIF faucet is not configured yet.");
   const { client, account } = await walletClient();
+  const alreadyClaimed = await publicClient().readContract({
+    address: faucetAddress,
+    abi: faucetAbi,
+    functionName: "claimed",
+    args: [account],
+  });
+  if (alreadyClaimed) {
+    throw new Error("This wallet has already claimed test WIF. Use another wallet.");
+  }
   const transaction = await client.writeContract({
     address: faucetAddress,
     abi: faucetAbi,
